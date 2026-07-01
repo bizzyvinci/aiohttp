@@ -1,10 +1,17 @@
 import asyncio
+from types import SimpleNamespace
 from typing import Optional
 
-from multidict import istr, CIMultiDict
+from multidict import CIMultiDict, istr
 from yarl import URL
+
 from aiohttp import hdrs
-from aiohttp.client_reqrep import ClientRequest, ClientResponse, RequestInfo, CIMultiDictProxy
+from aiohttp.client_reqrep import (
+    CIMultiDictProxy,
+    ClientRequest,
+    ClientResponse,
+    RequestInfo,
+)
 from aiohttp.helpers import TimerNoop
 
 
@@ -21,9 +28,7 @@ def has_surrogate(url: str) -> bool:
 
 def make_broken_redirect_response(loop, *, status=302):
     raw_location = b"https://example.com/synspr\xf8ve"
-    md = CIMultiDict(
-        {hdrs.LOCATION: raw_location.decode("utf-8", "surrogateescape")}
-    )
+    md = CIMultiDict({hdrs.LOCATION: raw_location.decode("utf-8", "surrogateescape")})
     url = URL("https://example.com/start")
     resp = ClientResponse(
         "GET",
@@ -35,6 +40,7 @@ def make_broken_redirect_response(loop, *, status=302):
         traces=[],
         loop=loop,
         session=None,
+        stream_writer=SimpleNamespace(output_size=0),
     )
     resp.status = status
     resp._headers = CIMultiDictProxy(md)
@@ -49,11 +55,13 @@ async def latin1_redirect_location_middleware(req, handler):
         raw_location = raw_header(resp.raw_headers, hdrs.LOCATION)
         r_url = resp.headers.get(hdrs.LOCATION)
         if raw_location and has_surrogate(r_url):
-            r_url = raw_location.decode("latin-1")      # correct url
-            md = CIMultiDict(resp.headers)              # copy proxy -> mutable dict
-            md[hdrs.LOCATION] = r_url                   # set new url
-            resp._headers = CIMultiDictProxy(md)        # set proxy back
-            resp._cache.pop("headers", None)            # pop cache so that resp.headers is re-evaluated
+            r_url = raw_location.decode("latin-1")  # correct url
+            md = CIMultiDict(resp.headers)  # copy proxy -> mutable dict
+            md[hdrs.LOCATION] = r_url  # set new url
+            resp._headers = CIMultiDictProxy(md)  # set proxy back
+            resp._cache.pop(
+                "headers", None
+            )  # pop cache so that resp.headers is re-evaluated
     return resp
 
 
@@ -72,7 +80,6 @@ async def test_middleware():
     assert "ø" in fixed_resp.headers[hdrs.LOCATION]
     assert "\udcf8" not in fixed_resp.headers[hdrs.LOCATION]
     print("Fixed URL:", repr(fixed_resp.headers[hdrs.LOCATION]))
-
 
 
 if __name__ == "__main__":
