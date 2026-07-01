@@ -49,7 +49,7 @@ async def latin1_redirect_location_middleware(req, handler):
     resp = await handler(req)
     if resp.status in (301, 302, 303, 307, 308):
         raw_location = raw_header(resp.raw_headers, hdrs.LOCATION)
-        r_url = resp.headers.get(hdrs.LOCATION)
+        r_url = resp.headers.get(hdrs.LOCATION) or resp.headers.get(hdrs.URI)
         if raw_location and has_surrogate(r_url):
             r_url = raw_location.decode("latin-1")  # correct url
             resp._headers._md[hdrs.LOCATION] = r_url  # set header url
