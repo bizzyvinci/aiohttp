@@ -52,7 +52,9 @@ def make_broken_redirect_response(loop, *, status=302):
 async def latin1_redirect_location_middleware(req, handler):
     resp = await handler(req)
     if resp.status in (301, 302, 303, 307, 308):
-        raw_location = raw_header(resp.raw_headers, hdrs.LOCATION)
+        raw_location = raw_header(resp.raw_headers, hdrs.LOCATION) or raw_header(
+            resp.raw_headers, hdrs.URI
+        )
         r_url = resp.headers.get(hdrs.LOCATION) or resp.headers.get(hdrs.URI)
         if raw_location and has_surrogate(r_url):
             r_url = raw_location.decode("latin-1")  # correct url
